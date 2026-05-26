@@ -42,7 +42,30 @@ Input file (.txt/.epub/.pdf)
 
 ## Phase 1: Extraction & Setup
 
-### 1a. Run the extraction script
+### 1a. Verify dependencies
+
+Before any extraction, ensure required Python packages are installed. Run once:
+
+```bash
+pip install ebooklib beautifulsoup4 lxml pymupdf Pillow requests
+```
+
+If a script fails with ModuleNotFoundError, install the missing package and retry. Do not ask the user — just install what's needed.
+
+### 1b. Locate scripts
+
+All bundled scripts live in the skill's `scripts/` directory. Resolve paths relative to the skill root:
+
+| Script | Purpose | Command |
+|--------|---------|---------|
+| `scripts/extract_epub.py` | EPUB → text + chapters | `python <skill_root>/scripts/extract_epub.py` |
+| `scripts/extract_pdf.py` | PDF → text + chapters | `python <skill_root>/scripts/extract_pdf.py` |
+| `scripts/fetch_cover.py` | Web search or generate cover | `python <skill_root>/scripts/fetch_cover.py` |
+| `scripts/build_epub.py` | Assemble final EPUB | `python <skill_root>/scripts/build_epub.py` |
+
+The skill root is typically `~/.claude/skills/book-translator/` (global install) or the directory containing this SKILL.md. If unsure, use the absolute path to the skill directory.
+
+### 1c. Run the extraction script
 
 Detect format and run the appropriate script immediately — do NOT ask for confirmation:
 
@@ -60,7 +83,7 @@ python scripts/extract_pdf.py "<book.pdf>" workspace/extracted/
 
 If the extraction produces too many or too few chapters, fix it silently. For PDFs where every page was misidentified as a chapter: merge all text and re-split at paragraph boundaries into ~2500-word chunks. Adapt to the actual structure of the book.
 
-### 1b. Initialize state files
+### 1d. Initialize state files
 
 Create `workspace/glossary.json`:
 ```json
@@ -74,7 +97,7 @@ Create `workspace/summary.json`:
 
 Create `workspace/translated/` directory.
 
-### 1c. Search for cover image
+### 1e. Search for cover image
 
 ```bash
 python scripts/fetch_cover.py "<Book Title>" "workspace/cover.jpg"
