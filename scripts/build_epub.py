@@ -151,7 +151,7 @@ def _write_epub(
 <head><title>内容简介</title></head>
 <body>
 <h2>内容简介</h2>
-{"".join(f"<p>{p}</p>" for p in summary_cn.split("\\n") if p.strip())}
+{"\n".join(f"<p>{p}</p>" for p in summary_cn.split(chr(10)) if p.strip())}
 </body></html>"""
         summary_page = epub.EpubHtml(title="内容简介", file_name="summary.xhtml", lang="zh-CN")
         summary_page.set_content(summary_html)
@@ -169,11 +169,18 @@ def _write_epub(
             ch_title = heading_match.group(1).strip()
             ch_text = re.sub(r"^##\s*.+\n+", "", ch_text, count=1)
 
+        # Split chapter text into paragraphs and wrap each in <p> tags
+        # Use actual newlines (not literal backslash-n)
+        paras = [p.strip() for p in ch_text.split("\n\n") if p.strip()]
+        if len(paras) <= 1:
+            # Fallback: split by single newlines if no double newlines found
+            paras = [p.strip() for p in ch_text.split("\n") if p.strip()]
+        para_html = "\n".join(f"<p>{p}</p>" for p in paras)
         ch_html = f"""<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-CN">
 <head><title>{ch_title}</title></head>
 <body>
 <h2>{ch_title}</h2>
-{"".join(f"<p>{p}</p>" for p in ch_text.split("\\n\\n") if p.strip())}
+{para_html}
 </body></html>"""
         ch_page = epub.EpubHtml(title=ch_title, file_name=f"ch_{ch_num:04d}.xhtml", lang="zh-CN")
         ch_page.set_content(ch_html)

@@ -29,8 +29,15 @@ Every translated word must be in **Simplified Chinese (简体中文)**. Traditio
 ### Rule 2: Sequential translation ONLY — NO parallel agents
 Translate chapters one at a time, in order. Never spawn sub-agents to translate multiple chapters in parallel. Each chapter's translation must read `workspace/summary.json` before translating — this is the ONLY way to maintain terminology and plot consistency across chapters. A sub-agent does not have access to the running summary and will produce inconsistent output.
 
-### Rule 3: NO asking for approval
-Once the user says "translate this book" (or equivalent), execute EVERY step without pausing:
+### Rule 3: NO asking for approval — and only 3 Python commands TOTAL
+Once the user says "translate this book" (or equivalent), execute EVERY step without pausing.
+**The ONLY Bash/Python commands in the ENTIRE translation are these 3 one-time scripts:**
+1. Extraction: `python scripts/extract_epub.py` (or extract_pdf.py) — ONCE
+2. Cover: `python scripts/fetch_cover.py` — ONCE
+3. EPUB build: `python scripts/build_epub.py` — ONCE
+
+**Everything else — translation, state updates, glossary — uses Read/Write tools ONLY. Zero Bash calls, zero Python calls, zero permission prompts during the translation loop.**
+
 - Run extraction scripts without asking
 - Translate every chapter without asking "should I continue?"
 - Build the EPUB without asking
@@ -163,29 +170,43 @@ Read `references/translation-style.md` for the full literary Chinese translation
 
 ### The loop — execute all chapters without pausing
 
+**CRITICAL**: Steps 6-7 use the **Write tool** directly, NOT Python. There are only THREE Python commands in the entire translation process: (1) extraction script, (2) cover fetch, (3) EPUB build. Everything else — including all state file updates — uses Read/Write tools only. This means ZERO Bash permission prompts during the translation loop.
+
 For each chapter N from 1 to total:
 
-**Step 1**: Read `workspace/extracted/chapters/chapter_NNNN.txt`
+**Step 1**: Read `workspace/extracted/chapters/chapter_NNNN.txt` (Read tool)
 
-**Step 2**: Read `workspace/summary.json` and `workspace/glossary.json` for context
+**Step 2**: Read `workspace/summary.json` and `workspace/glossary.json` for context (Read tool)
 
 **Step 3**: Translate into Simplified Chinese. Follow the guidelines in `references/translation-style.md`. Use glossary names. Add new characters/terms to glossary.
 
 **Step 4**: Scan the translated text for traditional Chinese characters. Replace any found with simplified equivalents.
 
-**Step 5**: Save to `workspace/translated/chapter_NNNN.md`
+**Step 5**: Save translation to `workspace/translated/chapter_NNNN.md` (Write tool)
 
-**Step 6**: Update `workspace/summary.json`:
-- `last_chapter`: N
-- `plot_summary`: Condense earlier events, keep under 500 words total
-- `current_situation`: Where things stand at chapter end
-- `pending_threads`: Unresolved plot threads
+**Step 6**: Update `workspace/summary.json` using the **Write tool** (NOT Python — write the JSON directly):
+```json
+{
+  "last_chapter": N,
+  "plot_summary": "<condensed summary, keep under 500 words>",
+  "current_situation": "<where things stand at chapter end>",
+  "pending_threads": ["<unresolved plot thread 1>", "<thread 2>"]
+}
+```
 
-**Step 7**: Update `workspace/glossary.json` with any new names/places/terms
+**Step 7**: Update `workspace/glossary.json` using the **Write tool** (NOT Python — write the JSON directly). Add any new characters, places, or terms discovered in this chapter:
+```json
+{
+  "characters": {"English Name": "中文名", ...},
+  "places": {"English Place": "中文地名", ...},
+  "terms": {"English Term": "中文术语", ...}
+}
+```
 
 **Step 8**: Report: "Chapter N/M done."
 
 Do not ask to continue. Just proceed to the next chapter.
+**Do not run any Python/Bash command to update state files. Use the Write tool only.**
 
 ## Phase 3: Non-Spoiler Summary
 
