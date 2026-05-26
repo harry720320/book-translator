@@ -1,183 +1,167 @@
 ---
 name: book-translator
-description: Translate entire English books into fluent, literary Chinese. Supports TXT, EPUB, and PDF input. Use when the user wants to translate a book, novel, or long English text into Chinese. Triggers on "translate this book", "translate to Chinese", "翻译这本书", "英译中", "book translation", "translate this novel", "turn this into Chinese", or whenever someone provides a book file (.txt, .epub, .pdf) and asks for Chinese translation. Also use when the user wants to translate long-form English content chapter by chapter with consistent terminology.
+description: Translate entire English books into fluent, literary Simplified Chinese (简体中文). Supports TXT, EPUB, and PDF input. Outputs a complete EPUB with bilingual title, non-spoiler summary, and cover image. Use when the user wants to translate a book, novel, or long English text into Chinese. Triggers on "translate this book", "translate to Chinese", "翻译这本书", "英译中", "book translation", "translate this novel", "turn this into Chinese", or whenever someone provides a book file (.txt, .epub, .pdf) and asks for Chinese translation. Also use when the user wants to translate long-form English content with consistent terminology.
 ---
 
 # Book Translator
 
-Translate entire English books into natural, literary Chinese — the kind that reads as if it were originally written in Chinese.
+Translate entire English books into natural, literary **Simplified Chinese (简体中文)** — the kind that reads as if it were originally written in Chinese. Output is a complete EPUB file with cover, summary, and glossary.
+
+## CRITICAL: Execution Rules
+
+These rules override any default behavior. Follow them strictly.
+
+### Rule 1: Simplified Chinese ONLY
+Every translated word must be in **Simplified Chinese (简体中文)**. Traditional Chinese characters (繁體字) are forbidden. Before saving each chapter, scan for traditional characters and replace them with simplified equivalents. Common traditional→simplified pairs: 説→说, 時→时, 個→个, 們→们, 來→来, 後→后, 會→会, 過→过, 對→对, 開→开, 關→关, 學→学, 見→见, 裡→里, 麼→么, 寫→写. If you see any character not in the standard simplified set, fix it.
+
+### Rule 2: Sequential translation ONLY — NO parallel agents
+Translate chapters one at a time, in order. Never spawn sub-agents to translate multiple chapters in parallel. Each chapter's translation must read `workspace/summary.json` before translating — this is the ONLY way to maintain terminology and plot consistency across chapters. A sub-agent does not have access to the running summary and will produce inconsistent output.
+
+### Rule 3: NO asking for approval
+Once the user says "translate this book" (or equivalent), execute EVERY step without pausing:
+- Run extraction scripts without asking
+- Translate every chapter without asking "should I continue?"
+- Build the EPUB without asking
+- Search for a cover image without asking
+The ONLY time you report progress is after each chapter: "Chapter N/M done." Do not ask. Just do.
+
+### Rule 4: Output as EPUB
+The final deliverable is an EPUB file, not Markdown. After translating all chapters, run `scripts/build_epub.py` to assemble the EPUB with proper metadata.
 
 ## High-Level Flow
 
 ```
 Input file (.txt/.epub/.pdf)
     → Extract text + detect chapters (scripts/)
-    → Translate chapter by chapter with running context
-    → Assemble final output (.md)
+    → Search for cover image (scripts/fetch_cover.py)
+    → Translate chapter by chapter WITH running summary context
+    → Generate non-spoiler summary
+    → Build EPUB (scripts/build_epub.py)
+    → Final deliverable: workspace/<BookTitle>.epub
 ```
 
-## Phase 1: Extraction
+## Phase 1: Extraction & Setup
 
-### TXT files
+### 1a. Run the extraction script
 
-Read directly. Split into chapters by looking for patterns like `Chapter 1`, `CHAPTER ONE`, `1.`, or blank-line-separated sections. If no chapter markers exist, split every ~3000 words at paragraph boundaries.
+Detect format and run the appropriate script immediately — do NOT ask for confirmation:
 
-Save chapters to `workspace/extracted/chapters/chapter_0001.txt`, etc.
+**TXT**: Read directly and split by chapter markers or ~3000-word boundaries.
 
-### EPUB files
-
-Run the bundled extraction script:
-
+**EPUB**:
 ```bash
-python scripts/extract_epub.py <book.epub> workspace/extracted/
+python scripts/extract_epub.py "<book.epub>" workspace/extracted/
 ```
 
-This produces:
-- `workspace/extracted/chapters/chapter_0001.txt` ... — one file per chapter
-- `workspace/extracted/metadata.json` — chapter titles, word counts, total stats
-
-The script reads the EPUB's TOC/spine and falls back to HTML parsing if needed.
-
-### PDF files
-
+**PDF**:
 ```bash
-python scripts/extract_pdf.py <book.pdf> workspace/extracted/
+python scripts/extract_pdf.py "<book.pdf>" workspace/extracted/
 ```
 
-Same output structure. The script uses pymupdf for text extraction and detects chapter boundaries from headings, font sizes, or page markers.
+If the extraction produces too many or too few chapters, fix it silently. For PDFs where every page was misidentified as a chapter: merge all text and re-split at paragraph boundaries into ~2500-word chunks. Adapt to the actual structure of the book.
 
-### Required dependencies
+### 1b. Initialize state files
 
-If a script fails with missing imports, install what's needed:
-
-```bash
-pip install ebooklib beautifulsoup4 lxml pymupdf
-```
-
-### After extraction
-
-Read `workspace/extracted/metadata.json` and report to the user:
-- Total chapters found
-- Total word count
-- Chapter titles (first 10, then "...")
-
-Ask the user to confirm chapter detection looks correct before proceeding. If chapters are wrong (merged, split incorrectly, missing), adjust manually and update metadata.json.
-
-## Phase 2: Translation Loop
-
-This is the core of the skill. Translate one chapter at a time, maintaining a **running summary** that provides continuity across chapters.
-
-### State files (in `workspace/`)
-
-| File | Purpose |
-|------|---------|
-| `summary.json` | Running context: characters, places, terms, plot summary |
-| `glossary.json` | Master name/term translation dictionary |
-| `translated/chapter_0001.md` | Each translated chapter |
-| `output.md` | Final assembled book (built incrementally) |
-
-### Initialize state
-
-Before translating the first chapter, create `workspace/glossary.json`:
-
+Create `workspace/glossary.json`:
 ```json
-{
-  "characters": {},
-  "places": {},
-  "terms": {},
-  "notes": []
-}
+{"characters": {}, "places": {}, "terms": {}}
 ```
 
 Create `workspace/summary.json`:
-
 ```json
-{
-  "last_chapter": 0,
-  "plot_summary": "",
-  "current_situation": "",
-  "pending_threads": []
-}
+{"last_chapter": 0, "plot_summary": "", "current_situation": "", "pending_threads": []}
 ```
 
-### Chapter translation loop
+Create `workspace/translated/` directory.
 
-For each chapter `N` from 1 to total:
+### 1c. Search for cover image
 
-**Step 1 — Read the chapter:**
-Read `workspace/extracted/chapters/chapter_NNNN.txt`.
-
-**Step 2 — Prepare context:**
-Read `workspace/summary.json` and `workspace/glossary.json`. This is the context for the current chapter.
-
-**Step 3 — Translate:**
-Translate the chapter following these rules (see `references/translation-style.md` for full guidelines):
-
-- Produce literary, idiomatic Chinese — not translationese
-- Use the glossary for all names and terms; add new entries as they appear
-- Match the original tone and register
-- Break long English sentences into natural Chinese rhythm
-- Handle idioms and cultural references naturally
-
-Output format for each chapter:
-
-```markdown
-## Chapter N: [Chapter Title in Chinese]
-
-[Translated text with paragraph breaks matching the original flow]
+```bash
+python scripts/fetch_cover.py "<Book Title>" "workspace/cover.jpg"
 ```
 
-Save to `workspace/translated/chapter_NNNN.md`.
+This script:
+1. Searches the web for the book's cover image by title + author
+2. If found: downloads the best match to `workspace/cover.jpg`
+3. If not found: generates a thematic cover image based on the extracted text using ASCII/geometric art, saves to `workspace/cover.jpg`
+4. Reports: "Cover: [found online / generated from plot]"
 
-Append it to `workspace/output.md` (with a blank line between chapters).
+## Phase 2: Translation Loop
 
-**Step 4 — Update running summary:**
-After translating, update `workspace/summary.json`:
+Read `references/translation-style.md` for the full literary Chinese translation guidelines. Key mandates:
 
+1. **Simplified Chinese ONLY (简体中文)** — scan every chapter for traditional characters before saving
+2. Use the glossary for ALL names and terms
+3. Natural Chinese rhythm — break long English sentences, vary sentence length
+4. No translationese: avoid excessive 的, 被, 当...的时候, 和-everywhere
+
+### The loop — execute all chapters without pausing
+
+For each chapter N from 1 to total:
+
+**Step 1**: Read `workspace/extracted/chapters/chapter_NNNN.txt`
+
+**Step 2**: Read `workspace/summary.json` and `workspace/glossary.json` for context
+
+**Step 3**: Translate into Simplified Chinese. Follow the guidelines in `references/translation-style.md`. Use glossary names. Add new characters/terms to glossary.
+
+**Step 4**: Scan the translated text for traditional Chinese characters. Replace any found with simplified equivalents.
+
+**Step 5**: Save to `workspace/translated/chapter_NNNN.md`
+
+**Step 6**: Update `workspace/summary.json`:
 - `last_chapter`: N
-- `plot_summary`: Concise summary of the story so far (expand incrementally, keep under 500 words by condensing earlier events)
-- `current_situation`: Where things stand at the end of this chapter (who is where, what just happened)
-- `pending_threads`: Unresolved plot threads the translator should remember
+- `plot_summary`: Condense earlier events, keep under 500 words total
+- `current_situation`: Where things stand at chapter end
+- `pending_threads`: Unresolved plot threads
 
-**Step 5 — Update glossary:**
-Add any new characters, places, or terms discovered in this chapter to `workspace/glossary.json`. Record both the English original and the Chinese translation used.
+**Step 7**: Update `workspace/glossary.json` with any new names/places/terms
 
-**Step 6 — Report progress:**
-Tell the user: "Translated Chapter N: [title] (X words → Y Chinese characters). Total progress: N/M chapters."
+**Step 8**: Report: "Chapter N/M done."
 
-### Pausing and resuming
+Do not ask to continue. Just proceed to the next chapter.
 
-If the session ends mid-book, the next session can pick up by reading `workspace/summary.json` and `workspace/glossary.json`, then continuing from `last_chapter + 1`.
+## Phase 3: Non-Spoiler Summary
 
-## Phase 3: Final Assembly
+After all chapters are translated, read `workspace/summary.json` and generate a **non-spoiler summary** of the book. This goes at the front of the EPUB.
 
-After all chapters are translated:
+Rules for the summary:
+- Describe the setup, setting, and main character(s) — what the reader needs to know going in
+- Hint at themes and the kind of story this is (mystery, romance, dystopian, literary fiction, etc.)
+- Reveal ONLY what would appear on the back cover or dust jacket of a published book
+- Never spoil major plot twists, the ending, or revelations from the second half of the book
+- Write in Chinese (简体中文), 150-300 characters
+- Title it "内容简介"
 
-1. Verify `workspace/output.md` has all chapters in order
-2. Append a **Translation Glossary** section at the end listing all characters, places, and terms with their English→Chinese mappings
-3. Report final stats: total Chinese characters, chapters, any notes on difficult passages
+Save to `workspace/summary_cn.txt`.
 
-The final deliverable is `workspace/output.md` — a single Markdown file containing the complete translated book.
+## Phase 4: Build EPUB
 
-## Special cases
-
-### Very short books (< 3 chapters / < 5000 words)
-
-Skip the chapter loop and translate in one pass. Still build glossary for consistency.
-
-### Bilingual output
-
-If the user wants bilingual (English + Chinese), output each paragraph as:
-
-```
-> English original paragraph
-
-Chinese translation paragraph
+```bash
+python scripts/build_epub.py workspace/
 ```
 
-### Quality review
+The script produces `workspace/<ChineseTitle>.epub` with:
 
-If the user asks to review a specific chapter, re-read the original chapter text and the translation, and check against the guidelines in `references/translation-style.md`. Focus on: name consistency, natural Chinese flow, and tone matching.
+### EPUB metadata
+- **Title**: "English Title —— 中文书名" (bilingual, with em-dash separator)
+- **Author**: Original author name (English)
+- **Translator**: "Claude (AI Literary Translator)"
+- **Language**: zh-CN
+
+### EPUB contents (in order)
+1. **Cover page**: `workspace/cover.jpg` as the epub cover image
+2. **Title page**: Bilingual title + author + translator credit
+3. **内容简介**: The non-spoiler Chinese summary
+4. **Chapters**: Each translated chapter as a separate internal section
+5. **翻译术语表**: The complete glossary appendix
+
+### Dependencies for EPUB building
+```bash
+pip install ebooklib beautifulsoup4 lxml pymupdf Pillow requests
+```
+
+The script uses `ebooklib` to create a valid EPUB 3.0 file with proper NCX and NAV tables of content.
 
 ## Workspace structure
 
@@ -187,13 +171,32 @@ workspace/
 │   ├── metadata.json
 │   └── chapters/
 │       ├── chapter_0001.txt
-│       ├── chapter_0002.txt
 │       └── ...
 ├── translated/
 │   ├── chapter_0001.md
-│   ├── chapter_0002.md
 │   └── ...
+├── cover.jpg
 ├── summary.json
 ├── glossary.json
-└── output.md
+├── summary_cn.txt
+└── <BookTitle>.epub        ← Final deliverable
+```
+
+## Quick reference: script commands
+
+```bash
+# Extract text from EPUB
+python scripts/extract_epub.py "<book.epub>" workspace/extracted/
+
+# Extract text from PDF
+python scripts/extract_pdf.py "<book.pdf>" workspace/extracted/
+
+# Fetch or generate cover image
+python scripts/fetch_cover.py "<Book Title>" "workspace/cover.jpg"
+
+# Build final EPUB
+python scripts/build_epub.py workspace/
+
+# Install all dependencies
+pip install ebooklib beautifulsoup4 lxml pymupdf Pillow requests
 ```

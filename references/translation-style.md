@@ -2,7 +2,40 @@
 
 ## Core Principle
 
-Produce Chinese that reads as if it were originally written in Chinese by a skilled native writer. The reader should never feel they are reading a translation.
+Produce **Simplified Chinese (简体中文)** that reads as if it were originally written in Chinese by a skilled native writer. The reader should never feel they are reading a translation.
+
+## CRITICAL: Simplified Chinese ONLY (简体中文)
+
+Every translated character must be in Simplified Chinese. Traditional Chinese characters (繁體字) are forbidden. This is non-negotiable.
+
+Before finalizing each chapter, scan the output for traditional characters. The most common offenders:
+
+| Traditional | Simplified | | Traditional | Simplified |
+|------------|------------|------------|------------|
+| 説 | 说 | 時 | 时 |
+| 個 | 个 | 們 | 们 |
+| 來 | 来 | 後 | 后 |
+| 會 | 会 | 過 | 过 |
+| 對 | 对 | 開 | 开 |
+| 關 | 关 | 學 | 学 |
+| 見 | 见 | 裡/裏 | 里 |
+| 麼 | 么 | 寫 | 写 |
+| 為 | 为 | 國 | 国 |
+| 書 | 书 | 長 | 长 |
+| 門 | 门 | 間 | 间 |
+| 頭 | 头 | 體 | 体 |
+| 實 | 实 | 從 | 从 |
+| 當 | 当 | 還 | 还 |
+| 電 | 电 | 點 | 点 |
+| 東 | 东 | 氣 | 气 |
+| 車 | 车 | 動 | 动 |
+| 現 | 现 | 發 | 发 |
+| 業 | 业 | 經 | 经 |
+| 義 | 义 | 廣 | 广 |
+| 樂 | 乐 | 專 | 专 |
+| 機 | 机 | 錢 | 钱 |
+
+If you find ANY of the right-column characters in your output, replace them with the left-column equivalents. Also replace any other traditional-looking characters. When in doubt: if a character looks complex and "old-style," use its simplified form.
 
 ## Voice and Register
 
