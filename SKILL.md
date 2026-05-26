@@ -1,6 +1,16 @@
 ---
 name: book-translator
-description: Translate entire English books into fluent, literary Simplified Chinese (简体中文). Supports TXT, EPUB, and PDF input. Outputs a complete EPUB with bilingual title, non-spoiler summary, and cover image. Use when the user wants to translate a book, novel, or long English text into Chinese. Triggers on "translate this book", "translate to Chinese", "翻译这本书", "英译中", "book translation", "translate this novel", "turn this into Chinese", or whenever someone provides a book file (.txt, .epub, .pdf) and asks for Chinese translation. Also use when the user wants to translate long-form English content with consistent terminology.
+description: >-
+  Translate entire English books into fluent, literary Simplified Chinese (简体中文).
+  Supports TXT, EPUB, and PDF input. Outputs a complete EPUB with bilingual title,
+  non-spoiler summary, and cover image. Use whenever the user wants to translate a
+  book, novel, or long English text into Chinese — even if they don't explicitly say
+  "translate." Triggers on: "translate this book", "translate to Chinese",
+  "翻译这本书", "英译中", "book translation", "translate this novel",
+  "turn this into Chinese", "can you translate", "帮我翻译",
+  "把这本书翻成中文", or whenever someone provides a book file (.txt, .epub, .pdf)
+  in a context that suggests translation. Also triggers when the user mentions wanting
+  a Chinese version of any English book, EPUB, or PDF, or asks for "简体中文版".
 ---
 
 # Book Translator
