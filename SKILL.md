@@ -109,6 +109,37 @@ This script:
 3. If not found: generates a thematic cover image based on the extracted text using ASCII/geometric art, saves to `workspace/cover.jpg`
 4. Reports: "Cover: [found online / generated from plot]"
 
+## Handling Edge Cases
+
+### Resuming after interruption
+
+If the session ends mid-book, a new session can pick up seamlessly. On startup, check if `workspace/summary.json` exists with `last_chapter` > 0. If so, resume from `last_chapter + 1` — all context is preserved in the state files. Do NOT re-extract or re-translate chapters that are already done.
+
+### Very large books (>100K words)
+
+For books exceeding 100K words, the translation loop may exceed session limits. Strategy:
+1. Translate as many chapters as possible in the current session
+2. State is auto-saved after every chapter (`summary.json`, `glossary.json`)
+3. The user can resume in a new session by re-invoking the skill — it detects existing state and continues
+4. If a single chapter exceeds ~5000 words, split it into sub-sections and translate each with the same running context
+
+### EPUB with no TOC or spine
+
+If the EPUB extraction script returns empty results (no TOC, no recognizable spine):
+1. Fall back to ZIP+HTML parsing (already built into `extract_epub.py`)
+2. If that also fails, extract all text from every HTML file, merge, and split by heading patterns or ~2500-word boundaries
+3. If the EPUB is DRM-protected: report "This EPUB appears to be DRM-protected and cannot be extracted" and stop
+
+### PDF with no extractable text (scanned book)
+
+If the PDF extraction returns fewer than 500 total words:
+1. Report: "This PDF appears to be a scanned document (image-based, no text layer). OCR is needed."
+2. Do NOT attempt OCR — it requires specialized tools beyond this skill's scope
+
+### TXT with no chapter markers
+
+Split the text into ~2500-word chunks at paragraph boundaries. Name them `chapter_0001.txt`, `chapter_0002.txt`, etc. The book will still translate correctly — the running summary maintains cross-chapter continuity regardless of where chapters are split.
+
 ## Phase 2: Translation Loop
 
 Read `references/translation-style.md` for the full literary Chinese translation guidelines. Key mandates:
