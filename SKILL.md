@@ -15,6 +15,8 @@ description: >-
 
 # Book Translator
 
+> **TL;DR**: Extract text → Translate sequentially (简体中文 only, NO parallel agents) → Build EPUB with cover + summary + glossary. Run everything without asking. Output: `workspace/<书名>.epub`
+
 Translate entire English books into natural, literary **Simplified Chinese (简体中文)** — the kind that reads as if it were originally written in Chinese. Output is a complete EPUB file with cover, summary, and glossary.
 
 ## CRITICAL: Execution Rules
